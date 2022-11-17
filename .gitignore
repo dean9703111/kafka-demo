@@ -1,0 +1,3 @@
+node_modules
+deploy/kafkaCluster/kraft/data
+deploy/kafkaCluster/kraft/config
