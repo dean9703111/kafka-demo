@@ -42,7 +42,7 @@
 透過上面的故事，大家應該對 Kafka 消息轉發者（Message broker）的定位更為理解，下面再簡單說明一下它的基礎架構與階層關係
 
 ```
-Producer    kafka cluster                             Consumer
+[Producer]  [kafka cluster]                         [Consumer]
               ├── Broker1                           
 Producer0->   │     ├── Topic A
               │     │     ├── Partition0(Leader)  -> Consumer Group A
