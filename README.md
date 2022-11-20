@@ -75,7 +75,7 @@ Producer1->               └── Partition0(Leader)  -> Consumer Group B
 
 ### 三、Kafka 為什麼速度快、吞吐量大？
 
-- **順序讀寫**：Kafka 會將資料寫到硬碟上，通常我們都會覺得硬碟讀寫效能不理想；但效能是否理想，是取決於`順序讀寫 or 隨機讀寫`，無論硬碟還是記憶體都是如此。
+- **順序讀寫**：Kafka 將資料寫到硬碟上，通常我們都會覺得硬碟的讀寫效能不理想；但效能是否理想，是取決於`順序讀寫 or 隨機讀寫`，無論硬碟還是記憶體都是如此。
 - **零拷貝**：從 Producer 到 Broker，Kafka 把資料持久化到硬碟的方式採用 mmap（從 2 次 CPU 拷貝減為 1 次）；從 Broker 到 Consumer，Kafka 把硬碟資料發送的方式採用 sendFile（零拷貝）。
 - **批量發送**：Producer 在發送消息時，可以等消息到固定數量後再一次發送（假設網路頻寬為 10MB/s，一次傳送 10MB 的消息會比 1KB 消息分 10,000 次傳送快很多）。
 - **批量壓縮**：有時系統的瓶頸不在 CPU 或是硬碟，而是在網路 IO；針對這個問題，我們可以在批量發送的基礎上加入批量壓縮，以此降低 IO 負擔。
@@ -146,7 +146,7 @@ services:
 docker-compose up -d
 ```
 
-**SETP 5**：新增「producer.js」貼上如下程式，我們會透過它每隔 3 秒產生消息到指定的 topic。
+**SETP 5**：新增「producer.js」貼上如下程式，我們會透過它每隔 2 秒產生消息到指定的 topic。
 
 ```js
 const { Kafka, CompressionTypes, logLevel } = require('kafkajs')
@@ -298,13 +298,13 @@ signalTraps.forEach(type => {
 透過下面的 Gif 大家可以看到消息傳送＆消費的過程。
 ![image](./img/Kafka-basic.gif)
 
-> 確認消息可以順利生產與消費後，記得透過「crontrol + c」將程式關閉。
+> 確認消息可以順利生產與消費後，記得透過「Crontrol + C」將程式關閉。
 
 #### ➤ Kafka 持久化驗證
 這邊我們再做一個**持久化**的實驗，我們把「consumer.js」裏面 groupId 的值改為「test-group2」，來確認是否可以重新消費過去的消息。
 
 通過下圖我們可以得知 Kafka 的資料是持久化的，不會因為有消費者消費而消失；因此擴張的時候，只需要增加消費者來處理資料即可。
-![image](./img/)
+![image](./img/kafka-persist.png)
 
 #### ➤ 1 個 Partition 的數據只允許 Consumer Group 中的某個 Consumer 消費
 接著我們來驗證，在 Producer 的 Partition 只有 1 個的情境下，是不是相同的 group_id 下只會有一個 consumer 進行消費；這次要開啟 3 個分頁，1 個模擬生產者，2 個模擬消費者。
