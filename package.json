@@ -1,13 +1,12 @@
 {
   "name": "kafka",
   "version": "1.0.0",
-  "description": "",
+  "description": "正在為大數據所苦嗎？帶你了解 Kafka 這個分布式消息串流平台，以及它能解決什麼問題！",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["kafkajs","kafka","kafka producer","kafka consumer","node"],
+  "author": "Dean Lin",
   "license": "ISC",
   "dependencies": {
     "kafkajs": "^2.2.2"

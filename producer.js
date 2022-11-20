@@ -7,19 +7,25 @@ const kafka = new Kafka({
 
 const topic = 'topic-test'
 const numPartitions = 2;
-const MyPartitioner = () => {
-  return ({ topic, partitionMetadata, message }) => {
-    // select a partition based on some logic
-    // return the partition number
-    // console.log('topic:'+topic)
-    // console.log(partitionMetadata)
-
-    console.log('message.partition:' + message.partition)
-    return message.partition
+const crateTopic = async (topic) => {
+  const admin = kafka.admin();
+  await admin.connect();
+  const topics = await admin.listTopics();
+  if (!topics.includes(topic)) {
+    await admin.createTopics({
+      topics: [{
+        topic: topic,
+        numPartitions: numPartitions
+      }],
+    })
+    const fetchTopicOffsets = await admin.fetchTopicOffsets('topic-test')
+    console.log(`Crate topic:${topic} successful!`)
+    console.log(fetchTopicOffsets)
   }
+  await admin.disconnect();
 }
-const producer = kafka.producer({ createPartitioner: MyPartitioner })
 
+const producer = kafka.producer()
 const getRandomNumber = () => Math.round(Math.random(10) * 1000)
 const createMessage = (num, partition = 0) => ({
   key: `key-${num}`,
@@ -32,30 +38,12 @@ const sendMessage = () => {
     .send({
       topic,
       compression: CompressionTypes.GZIP,
-      // messages: Array(createMessage(getRandomNumber()))
+      messages: Array(createMessage(getRandomNumber()))
       // 用來測試 kafka 多個 Partition 與 Consumer 的關係
-      messages: Array(createMessage(getRandomNumber(), 0), createMessage(getRandomNumber(), 1))
+      // messages: Array(createMessage(getRandomNumber(), 0), createMessage(getRandomNumber(), 1))
     })
     .then(console.log)
     .catch(e => console.error(`[example/producer] ${e.message}`, e))
-}
-
-async function crateTopic (topic) {
-  const admin = kafka.admin();
-  await admin.connect();
-  const topics = await admin.listTopics();
-  if (!topics.includes(topic)) {
-    await admin.createTopics({
-      topics: [{
-        topic: topic,
-        numPartitions: 2
-      }],
-    })
-    const fetchTopicOffsets = await admin.fetchTopicOffsets('topic-test')
-    console.log(`Crate topic:${topic} successful!`)
-    console.log(fetchTopicOffsets)
-  }
-  await admin.disconnect();
 }
 
 const run = async () => {

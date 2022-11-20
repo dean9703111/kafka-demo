@@ -14,9 +14,10 @@
 
 一、Kafka 具體能解決哪些問題，為什麼能解決？
 二、Kafka 的基礎架構與階層關係
-三、Redis 也能夠處理 Pub/Sub，為什麼要用 Kafka？
-四、手把手帶你建立 Node.js 專案 ＆ Kafka 環境
-五、啟動專案，了解 Kafka 的運行邏輯
+三、Kafka 為什麼吞吐量大？
+四、Redis 也能夠處理 Pub/Sub，為什麼要用 Kafka？
+五、手把手帶你建立 Node.js 專案 ＆ Kafka 環境
+六、啟動專案，了解 Kafka 的運行邏輯
 ```
 
 > 本篇是參考了許多大神的文章，再用自己的話語表達出來，筆者將相關資源放在最下方，有興趣的讀者可以參考看看。
@@ -42,7 +43,7 @@
 透過上面的故事，大家應該對 Kafka 消息轉發者（Message broker）的定位更為理解，下面再簡單說明一下它的基礎架構與階層關係
 
 ```
-[Producer]  [kafka cluster]                         [Consumer]
+[Producer]  [Kafka cluster]                         [Consumer]
               ├── Broker1                           
 Producer0->   │     ├── Topic A
               │     │     ├── Partition0(Leader)  -> Consumer Group A
@@ -58,7 +59,7 @@ Producer1->               └── Partition0(Leader)  -> Consumer Group B
 ```
 
 - **Producer**：生產者，為消息的入口。
-- **kafka cluster**：Kafka 的集群，通常會有多個 Broker。
+- **Kafka cluster**：Kafka 的集群，通常會有多個 Broker。
 - **Broker**：Kafka 的實體，可以把它想像成每個 Broker 對應一台 Server。
 - **Topic**：消息的主題，有點像是資料庫的 Table。
 - **Partition**：Topic 的分區，一個 Topic 可以有多個分區，同個 Topic 每個分區裡面的數據不會重複。
@@ -66,14 +67,20 @@ Producer1->               └── Partition0(Leader)  -> Consumer Group B
 - **Consumer**：消費者，為消息的出口。
 - **Consumer Group**：可以將多個消費者組成一個消費群組，在 Kafka 的設計中，一個 Partition 的數據只允許消費群組中的某個消費者消費，消費群組中的消費者可以消費同一個 Topic 不同 Partition 的數據。
 
-通常狀態下，一個 Consumer Group 下的 Consumer 數量，會建議與 Partition 的數量相同；下面我們把 Partition 當成一碗飯，Consumer 比喻為一個人。
-- 可以出現一個人吃多碗飯的情況。（吃貨）
+通常狀態下，一個 Consumer Group 下的 Consumer 數量，建議與 Partition 的數量相同；下面我們把 Partition 當成一碗飯，Consumer 比喻為一個人，這樣會更好理解為何要這樣設計。
+- 可以出現一個人吃多碗飯的情況。（吃太飽了）
 - 不能出現多個人吃一碗飯的情況。（不能搶飯吃）
 - 如果人比飯碗多，那就得有人餓著。
-- **一人一碗飯，剛好。**
+- **一人一碗，剛好。**
 
+### 三、Kafka 為什麼速度快、吞吐量大？
 
-### 三、Redis 也能夠處理 Pub/Sub，為什麼要用 Kafka？
+- **順序讀寫**：Kafka 會將資料寫到硬碟上，通常我們都會覺得硬碟讀寫效能不理想；但效能是否理想，是取決於`順序讀寫 or 隨機讀寫`，無論硬碟還是記憶體都是如此。
+- **零拷貝**：從 Producer 到 Broker，Kafka 把資料持久化到硬碟的方式採用 mmap（從 2 次 CPU 拷貝減為 1 次）；從 Broker 到 Consumer，Kafka 把硬碟資料發送的方式採用 sendFile（零拷貝）。
+- **批量發送**：Producer 在發送消息時，可以等消息到固定數量後再一次發送（假設網路頻寬為 10MB/s，一次傳送 10MB 的消息會比 1KB 消息分 10,000 次傳送快很多）。
+- **批量壓縮**：有時系統的瓶頸不在 CPU 或是硬碟，而是在網路 IO；針對這個問題，我們可以在批量發送的基礎上加入批量壓縮，以此降低 IO 負擔。
+
+### 四、Redis 也能夠處理 Pub/Sub，為什麼要用 Kafka？
 
 筆者在網路上看到一個很有趣的[比喻](https://zhuanlan.zhihu.com/p/68052232)，在這裡分享給大家。
 
@@ -89,9 +96,9 @@ Kafka 將資料儲存在硬碟上，為消息提供了持久化的服務，這�
 
 > 如果想把 Redis 的資料持久化也能辦到，但並不是那麼的可靠。
 
-### 四、手把手帶你建立 Node.js 專案 ＆ Kafka 環境
+### 五、手把手帶你建立 Node.js 專案 ＆ Kafka 環境
 
-前面講了這麼多理論，下面就讓我們建立一個 Node.js 專案來實際了解 Kafka 的運作邏輯吧！
+前面講了這麼多理論，下面就建立一個 Node.js 專案，來實際了解 Kafka 的運作邏輯吧！
 
 > 如果懶得按照步驟執行，可以直接到筆者的 Github Clone 一份下來。
 > 筆者 local 的 Node.js 版本為 v18.12.0。
@@ -103,13 +110,13 @@ npm init -f
 npm install --save kafkajs
 ```
 
-**SETP 2**：建立儲存 kafka 數據的資料夾（這是下一步「docker-compose.yml」裏面「volumes」的路徑）
+**SETP 2**：建立儲存 Kafka 數據的資料夾（這是下一步「docker-compose.yml」裏面「volumes」的路徑）
 
 ```
 mkdir -p deploy/kafkaCluster/kraft
 ```
 
-**SETP 3**：新增「docker-compose.yml」貼上如下程式；這裡筆者選用不依賴 zookeeper 的 kafka 版本（KRaft），過去主流會使用 zookeeper 來保存消息，但 kafka 官方表示在不久後就不再支援 zookeeper，故筆者做此選擇，至於 KRaft 本身有哪些優勢，感興趣的朋友可以參考[連結](https://www.cnblogs.com/smartloli/p/16430041.html)。
+**SETP 3**：新增「docker-compose.yml」貼上如下程式；這裡筆者選用不依賴 zookeeper 的 Kafka 版本（KRaft），過去主流會使用 zookeeper 來保存消息，但 Kafka 官方表示在不久後就不再支援 zookeeper，故筆者做此選擇，至於 KRaft 本身有哪些優勢，感興趣的朋友可以參考[連結](https://www.cnblogs.com/smartloli/p/16430041.html)。
 
 ```yml
 version: "3"
@@ -133,7 +140,7 @@ services:
       - ./deploy/kafkaCluster/kraft:/bitnami/kafka:rw
 ```
 
-**SETP 4**：輸入以下指令把 kafka 的 Docker 拉下來並執行。
+**SETP 4**：輸入以下指令把 Kafka 的 Docker 拉下來並執行，你可以把這個 Docker 想像成 Kafka Cluster 中的 Broker。
 
 ```
 docker-compose up -d
@@ -151,19 +158,25 @@ const kafka = new Kafka({
 
 const topic = 'topic-test'
 const numPartitions = 2;
-const MyPartitioner = () => {
-  return ({ topic, partitionMetadata, message }) => {
-    // select a partition based on some logic
-    // return the partition number
-    // console.log('topic:'+topic)
-    // console.log(partitionMetadata)
-
-    console.log('message.partition:' + message.partition)
-    return message.partition
+const crateTopic = async (topic) => {
+  const admin = kafka.admin();
+  await admin.connect();
+  const topics = await admin.listTopics();
+  if (!topics.includes(topic)) {
+    await admin.createTopics({
+      topics: [{
+        topic: topic,
+        numPartitions: numPartitions
+      }],
+    })
+    const fetchTopicOffsets = await admin.fetchTopicOffsets('topic-test')
+    console.log(`Crate topic:${topic} successful!`)
+    console.log(fetchTopicOffsets)
   }
+  await admin.disconnect();
 }
-const producer = kafka.producer({ createPartitioner: MyPartitioner })
 
+const producer = kafka.producer()
 const getRandomNumber = () => Math.round(Math.random(10) * 1000)
 const createMessage = (num, partition = 0) => ({
   key: `key-${num}`,
@@ -176,30 +189,12 @@ const sendMessage = () => {
     .send({
       topic,
       compression: CompressionTypes.GZIP,
-      // messages: Array(createMessage(getRandomNumber()))
+      messages: Array(createMessage(getRandomNumber()))
       // 用來測試 kafka 多個 Partition 與 Consumer 的關係
-      messages: Array(createMessage(getRandomNumber(), 0), createMessage(getRandomNumber(), 1))
+      // messages: Array(createMessage(getRandomNumber(), 0), createMessage(getRandomNumber(), 1))
     })
     .then(console.log)
     .catch(e => console.error(`[example/producer] ${e.message}`, e))
-}
-
-async function crateTopic (topic) {
-  const admin = kafka.admin();
-  await admin.connect();
-  const topics = await admin.listTopics();
-  if (!topics.includes(topic)) {
-    await admin.createTopics({
-      topics: [{
-        topic: topic,
-        numPartitions: 2
-      }],
-    })
-    const fetchTopicOffsets = await admin.fetchTopicOffsets('topic-test')
-    console.log(`Crate topic:${topic} successful!`)
-    console.log(fetchTopicOffsets)
-  }
-  await admin.disconnect();
 }
 
 const run = async () => {
@@ -240,17 +235,17 @@ signalTraps.forEach(type => {
 **SETP 6**：新增「consumer.js」貼上如下程式，我們透過它模擬消費者消費特定 topic 的消息。
 
 ```js
-const { Kafka, logLevel } = require('kafkajs')
-const kafka = new Kafka({
+const { Kafka, logLevel } = require('Kafkajs')
+const Kafka = new Kafka({
   logLevel: logLevel.INFO,
   brokers: [`localhost:9092`],
   clientId: 'example-consumer',
 })
 
 const topic = 'topic-test'
-const consumer = kafka.consumer({ groupId: 'test-group' })
-// 用來測試 kafka 持久化
-// const consumer = kafka.consumer({ groupId: 'test-group2' })
+const consumer = Kafka.consumer({ groupId: 'test-group' })
+// 用來測試 Kafka 持久化
+// const consumer = Kafka.consumer({ groupId: 'test-group2' })
 
 const run = async () => {
   await consumer.connect()
@@ -293,43 +288,47 @@ signalTraps.forEach(type => {
 ```
 
 
-### 五、啟動專案，了解 Kafka 的運行邏輯
+### 六、啟動專案，了解 Kafka 的運行邏輯
 
 > 建議使用有分頁功能的終端機（如 iTerm2），這樣比較好觀察與操作。
 
+#### ➤ 1 個 Producer VS 1 個 Consumer
 在專案根目錄下輸入 `node producer.js` 模擬「生產者傳送消息」，並在另一個分頁輸入 `node consumer.js` 模擬「消費者消費消息」。
 
-#### ➤ 1 個 Producer VS 1 個 Consumer
 透過下面的 Gif 大家可以看到消息傳送＆消費的過程。
-![image](./img/kafka-basic.gif)
-確認消息可以順利生產與消費後，把兩個程式用「crontrol + c」關閉。
+![image](./img/Kafka-basic.gif)
 
-#### ➤ 1 個 Partition 的數據只允許 Consumer Group 中的某個 Consumer 消費
-接著我們來驗證是不是相同的 group_id 底下，只會有一個 consumer 進行消費；這次要開啟 3 個分頁，1 個模擬生產者，2 個模擬消費者。
-
-透過下面的 Gif 大家可以看到在同一個 Consumer Group 中，的確只會有一個 Consumer 進行消費。
-![image](./img/kafka-group.gif)
-
-#### ➤ 2 個 Partition VS 2 個 Consumer
-先前有說到 Partition 最好與 Consumer 相等，這樣效率才會最高；這裡一樣是開啟 3 個分頁，1 個模擬生產者，2 個模擬消費者；同時對「producer.js」裡面的程式做微調如下：
-```js
-// 將原本的註解
-// messages: Array(createMessage(getRandomNumber())),
-// 解開下面的註解，測試 kafka 多個 Partition 與 Consumer 的關係
-messages: Array(createMessage(getRandomNumber(),0),createMessage(getRandomNumber(),1)),
-```
-
+> 確認消息可以順利生產與消費後，記得透過「crontrol + c」將程式關閉。
 
 #### ➤ Kafka 持久化驗證
-這邊我們再做一個**持久化**的實驗，我們把「consumer.js」裏面 groupId 的值改為「test-group2」，來確認他是否可以重新消費過去的消息。
+這邊我們再做一個**持久化**的實驗，我們把「consumer.js」裏面 groupId 的值改為「test-group2」，來確認是否可以重新消費過去的消息。
 
 通過下圖我們可以得知 Kafka 的資料是持久化的，不會因為有消費者消費而消失；因此擴張的時候，只需要增加消費者來處理資料即可。
 ![image](./img/)
 
-希望這篇文章有讓讀者初步了解 Kafka 的應用，之後筆者在找時間分享更深入的使用，不然一篇資訊量太大，大家讀起來也痛苦。
+#### ➤ 1 個 Partition 的數據只允許 Consumer Group 中的某個 Consumer 消費
+接著我們來驗證，在 Producer 的 Partition 只有 1 個的情境下，是不是相同的 group_id 下只會有一個 consumer 進行消費；這次要開啟 3 個分頁，1 個模擬生產者，2 個模擬消費者。
+
+透過下面的 Gif，大家可以看到在同一個 Consumer Group 中，的確只會有一個 Consumer 進行消費。
+![image](./img/Kafka-group.gif)
+
+#### ➤ 2 個 Partition VS 2 個 Consumer
+先前有說到 Partition 最好與 Consumer 相等，這樣效率才會最高（一個人一個碗）；這裡一樣是開啟 3 個分頁，1 個模擬生產者，2 個模擬消費者；同時對「producer.js」裡面的程式做微調如下：
+```js
+// 將原本的註解
+// messages: Array(createMessage(getRandomNumber())),
+// 解開下面的註解，測試 Kafka 多個 Partition 與 Consumer 的關係
+messages: Array(createMessage(getRandomNumber(),0),createMessage(getRandomNumber(),1)),
+```
+
+透過下面的 Gif，可以觀察到在 2 個 Partition VS 2 個 Consumer 時，消息會均勻的分配。
+![image](./img/Kafka-group.gif)
+
+希望這篇文章的內容與範例有讓讀者初步了解 Kafka 的應用，之後筆者再找時間分享其他組合應用，不然資訊量太大，大家讀起來也痛苦。
 
 參考文件：
-1. [再过半小时，你就能明白kafka的工作原理了](https://zhuanlan.zhihu.com/p/68052232)
+1. [再过半小时，你就能明白Kafka的工作原理了](https://zhuanlan.zhihu.com/p/68052232)
 2. [Kafka KRaft模式探索](https://www.cnblogs.com/smartloli/p/16430041.html)
-3. [kafka解决了什么问题?(CSDN)](https://blog.csdn.net/liuzhenghui666666/article/details/106467057)
-4. [kafka解决了什么问题?(知乎)](https://www.zhihu.com/question/53331259)
+3. [Kafka解决了什么问题?(CSDN)](https://blog.csdn.net/liuzhenghui666666/article/details/106467057)
+4. [Kafka解决了什么问题?(知乎)](https://www.zhihu.com/question/53331259)
+5. [KafkaJS](https://Kafka.js.org/)
