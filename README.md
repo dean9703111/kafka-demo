@@ -298,7 +298,7 @@ signalTraps.forEach(type => {
 在專案根目錄下輸入 `node producer.js` 模擬「生產者傳送消息」，並在另一個分頁輸入 `node consumer.js` 模擬「消費者消費消息」。
 
 透過下面的 Gif 大家可以看到消息傳送＆消費的過程。
-![image](./img/Kafka-basic.gif)
+![image](./img/kafka-basic.gif)
 
 > 確認消息可以順利生產與消費後，記得透過「Crontrol + C」將程式關閉。
 
@@ -312,7 +312,7 @@ signalTraps.forEach(type => {
 接著我們來驗證，在 Producer 的 Partition 只有 1 個的情境下，是不是相同的 group_id 下只會有一個 consumer 進行消費；這次要開啟 3 個分頁，1 個模擬生產者，2 個模擬消費者。
 
 透過下面的 Gif，大家可以看到在同一個 Consumer Group 中，的確只會有一個 Consumer 進行消費。
-![image](./img/Kafka-group.gif)
+![image](./img/kafka-group.gif)
 
 #### ➤ 2 個 Partition VS 2 個 Consumer
 先前有說到 Partition 最好與 Consumer 相等，這樣效率才會最高（一個人一個碗）；這裡一樣是開啟 3 個分頁，1 個模擬生產者，2 個模擬消費者；同時對「producer.js」裡面的程式做微調如下：
